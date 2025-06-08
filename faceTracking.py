@@ -5,6 +5,7 @@
 import cv2 as cv
 import mediapipe as mp
 import numpy as np
+import math
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -79,7 +80,7 @@ while cam.isOpened():
 
         landmark_points = face_detected.multi_face_landmarks[0].landmark
         for id, landmark in enumerate(landmark_points):
-            # Get the coordinates of the upper and lower lip landmarks
+            # Get the landmark coordinates and display them
             if id == UPPER_LIP:
                 upper_lip_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
                 cv.circle(frame, upper_lip_location, 5, (200, 255, 0), -1)
@@ -93,12 +94,15 @@ while cam.isOpened():
                 bottom_of_head_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
                 cv.circle(frame, bottom_of_head_location, 5, (0, 255, 255), -1)
 
-    # calculate mouth openness
-    head_scale = top_of_head_location[1] - bottom_of_head_location[1]
-    head_scale = abs(head_scale)  # Ensure it's a positive value
+    # calculate head scale and mouth openness
+    head_x_scale = (top_of_head_location[0] - bottom_of_head_location[0])
+    head_y_scale = (top_of_head_location[1] - bottom_of_head_location[1])
+    head_scale = math.sqrt((head_x_scale ** 2) + (head_y_scale ** 2))  
 
-    mouth_openness_raw = upper_lip_location[1] - lower_lip_location[1]
-    mouth_openness_raw = abs(mouth_openness_raw)  # Ensure it's a positive value
+    mouth_openness_x = upper_lip_location[0] - lower_lip_location[0]
+    mouth_openness_y = upper_lip_location[1] - lower_lip_location[1]
+    mouth_openness_raw = math.sqrt((mouth_openness_x ** 2) + (mouth_openness_y ** 2))
+
 
     # Normalize mouth openness based on head scale
     if mouth_openness_raw == 0:
@@ -107,17 +111,25 @@ while cam.isOpened():
         normalized_mouth_openness = 3 * (mouth_openness_raw / head_scale) # Scale factor of 3 for a roughly 0-1 range
         normalized_mouth_openness = min(max(normalized_mouth_openness, 0), 1)  # Clamp to [0, 1]
         normalized_mouth_openness = round(normalized_mouth_openness, 2)  # Round to 2 decimal places
+
+    # calculate head tilt
+    head_tilt = (top_of_head_location[0] - bottom_of_head_location[0]) / 300  # Scale factor of 300 for a roughly 0-1 range
+    head_tilt = min(max(head_tilt, -1), 1)  # Clamp to [-1, 1]
+    head_tilt = (head_tilt / 2) + 0.5  # Normalize to [0, 1]
+    head_tilt = round(head_tilt, 2)  # Round to 2 decimal places
     
 
     # display the frame with face mesh landmarks and variable text
     cv.putText(frame, "Press 'q' to exit", 
                (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (91, 95, 250), 2)
-    cv.putText(frame, f"Mouth Open: {mouth_openness_raw}",
-               (10, 60), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
-    cv.putText(frame, f"Head Scale: {head_scale}",
-               (10, 90), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
     cv.putText(frame, f"Normalized Mouth Open: {normalized_mouth_openness}",
-               (10, 120), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+               (10, 60), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+    cv.putText(frame, f"Head Tilt: {head_tilt}",
+               (10, 90), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+    # cv.putText(frame, f"Mouth Open: {mouth_openness_raw}",
+    #             (10, 120), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+    # cv.putText(frame, f"Head Scale: {head_scale}",
+    #             (10, 150), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
     
     cv.imshow("Face Mesh", frame)
 
