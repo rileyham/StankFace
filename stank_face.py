@@ -10,6 +10,8 @@ import time
 
 class StankFace:
     def __init__(self):
+        print("Initializing StankFace...")
+        
         # Initialize MediaPipe Face Mesh
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
@@ -19,12 +21,30 @@ class StankFace:
             min_tracking_confidence=0.5
         )
         self.mp_drawing = mp.solutions.drawing_utils
+        print("MediaPipe initialized")
         
-        # Initialize camera
+        # Initialize camera with specific parameters
+        print("Opening camera...")
         self.cap = cv2.VideoCapture(0)
+        time.sleep(2)  # Give camera time to warm up
+        
+        if not self.cap.isOpened():
+            raise Exception("Could not open camera")
+            
+        # Set camera properties with verification
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
+        # Verify camera is working with test capture
+        ret, frame = self.cap.read()
+        if not ret:
+            raise Exception("Camera read test failed")
+        print("Camera initialized successfully")
         
         # Initialize pygame for audio
+        print("Initializing audio...")
         pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+        print("Audio initialized")
         
         # Audio parameters
         self.base_frequency = 440.0  # A4
@@ -135,62 +155,77 @@ class StankFace:
     
     def run(self):
         """Main application loop"""
-        print("Stank Face is running! Press 'q' to quit.")
+        print("Stank Face is running! Press 'q' or ESC to quit.")
         print("Instructions:")
         print("- Raise eyebrows to increase pitch")
         print("- Open mouth to control volume")
         print("- Smile width affects... (future parameter)")
         
-        while True:
-            # Read frame from camera
-            ret, frame = self.cap.read()
-            if not ret:
-                break
-            
-            # Flip frame horizontally for mirror effect
-            frame = cv2.flip(frame, 1)
-            
-            # Convert BGR to RGB (MediaPipe uses RGB)
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Process frame with MediaPipe
-            results = self.face_mesh.process(rgb_frame)
-            
-            # Draw face landmarks and extract gestures
-            if results.multi_face_landmarks:
-                for face_landmarks in results.multi_face_landmarks:
-                    # Extract gestures from landmarks
-                    self.extract_gestures(face_landmarks)
+        print("Starting main loop...")
+        try:
+            while True:
+                # Read frame from camera
+                print("Reading frame...")  # Debug print - remove after fixing
+                ret, frame = self.cap.read()
+                if not ret:
+                    print("Failed to grab frame")
+                    break
+                
+                # Flip frame horizontally for mirror effect
+                frame = cv2.flip(frame, 1)
+                
+                # Convert BGR to RGB (MediaPipe uses RGB)
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # Process frame with MediaPipe
+                results = self.face_mesh.process(rgb_frame)
+                
+                # Draw face landmarks and extract gestures
+                if results.multi_face_landmarks:
+                    for face_landmarks in results.multi_face_landmarks:
+                        # Extract gestures from landmarks
+                        self.extract_gestures(face_landmarks)
+                        
+                        # Draw landmarks on frame (optional - for debugging)
+                        self.mp_drawing.draw_landmarks(
+                            frame, 
+                            face_landmarks, 
+                            self.mp_face_mesh.FACEMESH_CONTOURS
+                        )
+                        
+                        # Update audio based on gestures
+                        self.update_audio()
+                
+                # Display gesture values on screen
+                cv2.putText(frame, f"Eyebrow: {self.eyebrow_height:.2f}", (10, 30), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                cv2.putText(frame, f"Mouth Open: {self.mouth_openness:.2f}", (10, 70), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                cv2.putText(frame, f"Mouth Width: {self.mouth_width:.2f}", (10, 110), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                
+                # Show frame
+                cv2.imshow('Stank Face', frame)
+                
+                # Check for quit (both 'q' and ESC key)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q') or key == 27:  # 27 is ESC key
+                    break
                     
-                    # Draw landmarks on frame (optional - for debugging)
-                    self.mp_drawing.draw_landmarks(
-                        frame, 
-                        face_landmarks, 
-                        self.mp_face_mesh.FACEMESH_CONTOURS
-                    )
-                    
-                    # Update audio based on gestures
-                    self.update_audio()
-            
-            # Display gesture values on screen
-            cv2.putText(frame, f"Eyebrow: {self.eyebrow_height:.2f}", (10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f"Mouth Open: {self.mouth_openness:.2f}", (10, 70), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f"Mouth Width: {self.mouth_width:.2f}", (10, 110), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            # Show frame
-            cv2.imshow('Stank Face', frame)
-            
-            # Check for quit
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        
-        # Cleanup
-        self.cap.release()
-        cv2.destroyAllWindows()
-        pygame.mixer.quit()
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+        finally:
+            print("Cleaning up...")
+            # Stop any playing audio
+            pygame.mixer.stop()
+            # Release camera
+            if self.cap is not None:
+                self.cap.release()
+            # Close all windows
+            cv2.destroyAllWindows()
+            # Quit pygame mixer
+            pygame.mixer.quit()
+            print("Cleanup complete")
 
 if __name__ == "__main__":
     # Create and run Stank Face
