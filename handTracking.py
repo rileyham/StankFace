@@ -1,3 +1,6 @@
+# sample hand tracking using MediaPipe and OpenCV
+# courtesy of https://blog.roboflow.com/what-is-mediapipe/
+
 import cv2 as cv 
 import mediapipe.python.solutions.hands as mp_hands
 import mediapipe.python.solutions.drawing_utils as drawing
