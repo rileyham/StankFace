@@ -16,11 +16,10 @@ UPPER_LIP = 13
 LOWER_LIP = 14
 TOP_OF_HEAD = 10
 BOTTOM_OF_HEAD = 152
-
-upper_lip_location = 0
-lower_lip_location = 0
-top_of_head_location = 0
-bottom_of_head_location = 0
+LEFT_EYE_CORNER = 133
+RIGHT_EYE_CORNER = 362
+TOP_OF_RIGHT_BROW = 296
+TOP_OF_LEFT_BROW = 66
 
 # Initialize the face mesh model
 face_mesh = mp_face_mesh.FaceMesh(
@@ -93,43 +92,74 @@ while cam.isOpened():
             elif id == BOTTOM_OF_HEAD:
                 bottom_of_head_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
                 cv.circle(frame, bottom_of_head_location, 5, (0, 255, 255), -1)
+            elif id == LEFT_EYE_CORNER:
+                LEFT_EYE_CORNER_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
+                cv.circle(frame, LEFT_EYE_CORNER_location, 5, (255, 255, 0), -1)
+            elif id == RIGHT_EYE_CORNER:
+                RIGHT_EYE_CORNER_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
+                cv.circle(frame, RIGHT_EYE_CORNER_location, 5, (255, 0, 255), -1)
+            elif id == TOP_OF_LEFT_BROW:
+                top_of_left_brow_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
+                cv.circle(frame, top_of_left_brow_location, 5, (255, 255, 0), -1)
+            elif id == TOP_OF_RIGHT_BROW:
+                top_of_right_brow_location = (int(landmark.x * frame.shape[1]), int(landmark.y * frame.shape[0]))
+                cv.circle(frame, top_of_right_brow_location, 5, (255, 0, 255), -1)
 
-    # calculate head scale and mouth openness
-    head_x_scale = (top_of_head_location[0] - bottom_of_head_location[0])
-    head_y_scale = (top_of_head_location[1] - bottom_of_head_location[1])
-    head_scale = math.sqrt((head_x_scale ** 2) + (head_y_scale ** 2))  
+        # calculate head, mouth openness, and brow raise
+        head_x_scale = (top_of_head_location[0] - bottom_of_head_location[0])
+        head_y_scale = (top_of_head_location[1] - bottom_of_head_location[1])
+        head_scale = math.sqrt((head_x_scale ** 2) + (head_y_scale ** 2))  
 
-    mouth_openness_x = upper_lip_location[0] - lower_lip_location[0]
-    mouth_openness_y = upper_lip_location[1] - lower_lip_location[1]
-    mouth_openness_raw = math.sqrt((mouth_openness_x ** 2) + (mouth_openness_y ** 2))
+        mouth_openness_x = upper_lip_location[0] - lower_lip_location[0]
+        mouth_openness_y = upper_lip_location[1] - lower_lip_location[1]
+        mouth_openness_raw = math.sqrt((mouth_openness_x ** 2) + (mouth_openness_y ** 2))
 
+        brow_raise_x = ((top_of_left_brow_location[0] - LEFT_EYE_CORNER_location[0]) + (top_of_right_brow_location[0] - RIGHT_EYE_CORNER_location[0])) / 2
+        brow_raise_y = ((top_of_left_brow_location[1] - LEFT_EYE_CORNER_location[1]) + (top_of_right_brow_location[1] - RIGHT_EYE_CORNER_location[1])) / 2
+        brow_raise_raw = math.sqrt((brow_raise_x ** 2) + (brow_raise_y ** 2))
 
-    # Normalize mouth openness based on head scale
-    if mouth_openness_raw == 0:
-        normalized_mouth_openness = 0
-    else:
-        normalized_mouth_openness = 3 * (mouth_openness_raw / head_scale) # Scale factor of 3 for a roughly 0-1 range
-        normalized_mouth_openness = min(max(normalized_mouth_openness, 0), 1)  # Clamp to [0, 1]
-        normalized_mouth_openness = round(normalized_mouth_openness, 2)  # Round to 2 decimal places
-
-    # calculate head tilt
-    head_tilt = (top_of_head_location[0] - bottom_of_head_location[0]) / 300  # Scale factor of 300 for a roughly 0-1 range
-    head_tilt = min(max(head_tilt, -1), 1)  # Clamp to [-1, 1]
-    head_tilt = (head_tilt / 2) + 0.5  # Normalize to [0, 1]
-    head_tilt = round(head_tilt, 2)  # Round to 2 decimal places
+        # draw eye and brow average locations
+        cv.circle(frame, (int((top_of_left_brow_location[0] + top_of_right_brow_location[0])/2), int((top_of_left_brow_location[1] + top_of_right_brow_location[1])/2)), 5, (200, 0, 0), -1)
+        cv.circle(frame, (int((LEFT_EYE_CORNER_location[0] + RIGHT_EYE_CORNER_location[0])/2), int((LEFT_EYE_CORNER_location[1] + RIGHT_EYE_CORNER_location[1])/2)), 5, (200, 0, 0), -1)
     
 
-    # display the frame with face mesh landmarks and variable text
-    cv.putText(frame, "Press 'q' to exit", 
-               (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (91, 95, 250), 2)
-    cv.putText(frame, f"Normalized Mouth Open: {normalized_mouth_openness}",
-               (10, 60), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
-    cv.putText(frame, f"Head Tilt: {head_tilt}",
-               (10, 90), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
-    # cv.putText(frame, f"Mouth Open: {mouth_openness_raw}",
-    #             (10, 120), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
-    # cv.putText(frame, f"Head Scale: {head_scale}",
-    #             (10, 150), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        # Normalize mouth openness based on head scale
+        if mouth_openness_raw == 0:
+            normalized_mouth_openness = 0
+        else:
+            normalized_mouth_openness = 3 * (mouth_openness_raw / head_scale) # Scale factor of 3 for a roughly 0-1 range
+            normalized_mouth_openness = min(max(normalized_mouth_openness, 0), 1)  # Clamp to [0, 1]
+            normalized_mouth_openness = round(normalized_mouth_openness, 2)  # Round to 2 decimal places
+
+        # Normalize brow raise based on head scale
+        if brow_raise_raw == 0:
+            normalized_brow_raise = 0
+        else:
+            normalized_brow_raise = (abs(brow_raise_raw / head_scale) * 25) - 3.5 # Scale factor of 25 for a roughly 0-1 range
+            normalized_brow_raise = min(max(normalized_brow_raise, 0), 1) # Clamp to [0, 1]
+            normalized_brow_raise = round(normalized_brow_raise, 2)  # Round to 2 decimal places
+
+        # calculate head tilt
+        head_tilt = (top_of_head_location[0] - bottom_of_head_location[0]) / 300  # Scale factor of 300 for a roughly 0-1 range
+        head_tilt = min(max(head_tilt, -1), 1)  # Clamp to [-1, 1]
+        head_tilt = (head_tilt / 2) + 0.5  # Normalize to [0, 1]
+        head_tilt = round(head_tilt, 2)  # Round to 2 decimal places
+    
+        # display the frame with face mesh landmarks and variable text
+        cv.putText(frame, "Press 'q' to exit", 
+                (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1, (91, 95, 250), 2)
+        cv.putText(frame, f"Normalized Mouth Open: {normalized_mouth_openness}",
+                (10, 60), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        cv.putText(frame, f"Head Tilt: {head_tilt}",
+                (10, 90), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        cv.putText(frame, f"Brow Raise Raw: {brow_raise_raw}",
+                (10, 120), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        cv.putText(frame, f"Normalized Brow Raise: {normalized_brow_raise}",
+                (10, 150), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        # cv.putText(frame, f"Mouth Open: {mouth_openness_raw}",
+        #             (10, 120), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
+        # cv.putText(frame, f"Head Scale: {head_scale}",
+        #             (10, 150), cv.FONT_HERSHEY_SIMPLEX, 1, (100, 250, 250), 2)
     
     cv.imshow("Face Mesh", frame)
 
